@@ -1,6 +1,7 @@
 from selenium.webdriver.common.by import By
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+import time
 import asyncio
 from aiogram.filters import Command, CommandObject, Text
 from aiogram import Bot, Dispatcher, types, Router, F
@@ -11,6 +12,8 @@ from aiogram.utils.keyboard import \
     ReplyKeyboardMarkup, ReplyKeyboardBuilder, InlineKeyboardBuilder, \
     InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton
 from aiogram.types import FSInputFile
+from bs4 import BeautifulSoup
+import requests
 import os
 import logging
 from logging import getLogger
@@ -50,8 +53,9 @@ def log_message(log_type, user_id, message, traceback_):
 users = []
 token = ''
 chrome_profile_path = ''
+personal = ''
 
-with open("config.txt", "r") as config_file:
+with open("config.txt", "r", encoding="utf-8") as config_file:
     lines = config_file.readlines()
 for line in lines:
     if "TELEGRAM_BOT_TOKEN" in line:
@@ -64,6 +68,9 @@ for line in lines:
 
     elif "CHROME_PROFILE_PATH" in line:
         chrome_profile_path = line.split("=")[1].strip().strip('"')
+
+    elif "PERSONAL" in line:
+        personal = line.split("=")[1].strip().strip('"')
 
 storage = MemoryStorage()
 bot = Bot(token=token, parse_mode="HTML")
@@ -86,11 +93,58 @@ options.add_argument("--headless")
 driver = webdriver.Chrome(options=options)
 
 
+class Participant:
+    def __init__(self, name, volume=None, rank=None, cell=None):
+        self.name = name  # DS: имя участника торгов
+        self.volume = volume  # DS: объем закупки
+        self.rank = rank  # DS: текущее положение в рейтинге закупки
+        self.cell = cell  # DS: статичный номер ячейки в таблице участников
+
+    def __str__(self):
+        return f"Name: {self.name}, Volume: {self.volume}, Rank: {self.rank}, Cell: {self.cell}"
+
+    def update_volume(self, volume):
+        self.volume = volume
+
+    def update_rank(self, rank):
+        self.rank = rank
+
+
+def get_players(tender_link):
+    player = 0
+    participants = []
+    driver.get(tender_link)
+    html_code = driver.page_source
+    soup = BeautifulSoup(html_code, 'html.parser')
+    target_div = soup.find('div', {'class': 'table-wrap table-wrap--wide'})
+    # print(target_div)
+    soup = BeautifulSoup(str(target_div), 'html.parser')
+    thead = soup.find('tr', {'class': 'thead'})
+    # print(thead)
+    elements = thead.find_all(class_='company_and_user_info')
+    for i, element in enumerate(elements):
+        name = element.text.strip()  # Получение имени участника из текста элемента
+        cell = i
+        participant = Participant(name=name, cell=cell)  # Создание нового объекта Participant
+        participants.append(participant)  # Добавление объекта в список
+        if personal in name:
+            player = i
+    return participants, player
+    # print(participants[39])
+    # for p in participants:
+    #     print(p)
+
+
 @dp.message(Command(commands=['select']))
 async def cmd_select(message: types.Message, command: CommandObject):
-    tender_link = command.args
-    print(tender_link)
-    await bot.send_message(message.from_user.id, f'Приступаю к обработке тендера по ссылке:\n{tender_link}')
+    if 'b2b-center.ru/market/' in command.args:
+        tender_link = command.args
+        print(tender_link)
+        await bot.send_message(message.from_user.id, f'Приступаю к обработке тендера по ссылке:\n{tender_link}')
+        result = get_players(tender_link)
+        participants = result[0]
+        player = result[1]
+        print(participants[player])
 
 
 @dp.message(Command(commands=['info']))
