@@ -110,9 +110,10 @@ class Participant:
         self.rank = rank
 
 
+participants = []
 def get_players(tender_link):
     player = 0
-    participants = []
+
     driver.get(tender_link)
     html_code = driver.page_source
     soup = BeautifulSoup(html_code, 'html.parser')
@@ -125,11 +126,25 @@ def get_players(tender_link):
     for i, element in enumerate(elements):
         name = element.text.strip()  # Получение имени участника из текста элемента
         cell = i
-        participant = Participant(name=name, cell=cell)  # Создание нового объекта Participant
-        participants.append(participant)  # Добавление объекта в список
         if personal in name:
             player = i
-    return participants, player
+        f = next((p for p in participants if p.name == name), None)
+        if not f:
+            participant = Participant(name=name, cell=cell)  # Создание нового объекта Participant
+            participants.append(participant)  # Добавление объекта в список
+
+    print([str(participant) for participant in participants])
+    print(participants[player])
+
+    # tbody = soup.find('tr', {'class': 'tbody'})
+    tbody = soup.find('tbody')
+    elements = tbody.find_all(attrs={'data-tr-eq': True})
+    for e in elements:
+        print()
+        print(e)
+
+
+    # return participants
     # print(participants[39])
     # for p in participants:
     #     print(p)
@@ -141,10 +156,8 @@ async def cmd_select(message: types.Message, command: CommandObject):
         tender_link = command.args
         print(tender_link)
         await bot.send_message(message.from_user.id, f'Приступаю к обработке тендера по ссылке:\n{tender_link}')
-        result = get_players(tender_link)
-        participants = result[0]
-        player = result[1]
-        print(participants[player])
+        get_players(tender_link)
+
 
 
 @dp.message(Command(commands=['info']))
