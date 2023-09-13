@@ -138,16 +138,42 @@ def get_players(tender_link):
 
     # tbody = soup.find('tr', {'class': 'tbody'})
     tbody = soup.find('tbody')
-    elements = tbody.find_all(attrs={'data-tr-eq': True})
-    for e in elements:
-        print()
-        print(e)
+    # elements = tbody.find_all(attrs={'data-tr-eq': True})
+    elements = soup.find_all(class_="c1 auction_offer_row_separator position_row")
+    our_positions = []
+    for num, e in enumerate(elements):
+        el = BeautifulSoup(str(e), 'html.parser').find_all(class_="multi_winner_offer_cell")
+        for n, elem in enumerate(el):
+            # print(n, _.text)
+            if n == player:
+                if elem.text != '—':
+                    price = elem.text.split('Ранг недоступен в данном типе процедуры')[1]
+                    price = float(price.split('руб.')[0].replace(' ', '').replace(',', '.').replace('\xa0', ''))
+                    amount = elem.text.split('Количество килограмм: ')[1]
+                    amount = int(amount.split('кг')[0].replace(' ', '').replace('\xa0', ''))
+                    pos = elem.find_parent(class_="c1 auction_offer_row_separator position_row").find(
+                        class_="multi_winner_position_cell").get('position_group_id', 'N/A')
+                    # print(f'Вн. номер строки {num}, видимый номер позиции {pos}, номер нашей колонки {n}, наша ставка {price} руб., наш объем {amount} кг.')
+                    our_positions.append({"internal_number":    num,    # DS: внутренний номер лота (строки)
+                                          "visible_number":     pos,    # DS: отображаемый номер лота (строки)
+                                          "our_column":         n,      # DS: номер нашей колонки
+                                          "our_price":          price,  # DS: наша цена заявки за единицу (руб)
+                                          "our_amount":         amount  # DS: наш объем заявки (кг)
+                                          })
+    elements = soup.find_all(class_='c1 auction_offer_row_separator')
+    # print(our_positions)
+    for p in our_positions:
+        print(p)
+        for num, e in enumerate(elements):
+            if e.has_attr("data-colspan-text") and f"Итого по лоту №{p['visible_number']} " in e.text:
+                print(e)
+                parent_element = e.find_parent(attrs={"data-tr-eq": True})
+                if parent_element:
+                    data_tr_eq_value = parent_element.get('data-tr-eq')
+                    print(data_tr_eq_value.text)
+            # el = BeautifulSoup(str(e), 'html.parser').find_all(class_="multi_winner_offer_cell")
 
 
-    # return participants
-    # print(participants[39])
-    # for p in participants:
-    #     print(p)
 
 
 @dp.message(Command(commands=['select']))
