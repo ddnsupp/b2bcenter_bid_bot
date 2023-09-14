@@ -110,8 +110,9 @@ class Participant:
         self.rank = rank
 
 
-participants = []
-def get_players(tender_link):
+
+def get_our_position(tender_link):
+    participants = []
     player = 0
 
     driver.get(tender_link)
@@ -161,18 +162,31 @@ def get_players(tender_link):
                                           "our_amount":         amount  # DS: наш объем заявки (кг)
                                           })
     elements = soup.find_all(class_='c1 auction_offer_row_separator')
+
     # print(our_positions)
     for p in our_positions:
-        print(p)
+        # print(p)
         for num, e in enumerate(elements):
-            if e.has_attr("data-colspan-text") and f"Итого по лоту №{p['visible_number']} " in e.text:
-                print(e)
-                parent_element = e.find_parent(attrs={"data-tr-eq": True})
-                if parent_element:
-                    data_tr_eq_value = parent_element.get('data-tr-eq')
-                    print(data_tr_eq_value.text)
-            # el = BeautifulSoup(str(e), 'html.parser').find_all(class_="multi_winner_offer_cell")
+            if f"Итого по лоту №{p['visible_number']} " in e.text:
+                # print(e)
+                fragment_soup = BeautifulSoup(str(e), 'html.parser')
 
+                els = fragment_soup.find_all(class_="c1 auction_offer_row_separator", attrs={"data-tr-eq": True})
+                for element in els:
+                    data_tr_eq_value = element.get('data-tr-eq')
+                    p['score_string'] = data_tr_eq_value
+                    # print(f"Значение атрибута data-tr-eq: {data_tr_eq_value}")
+
+                els = fragment_soup.find_all(class_="position_group_multi_winner_offer_cell")
+                for i, element in enumerate(els):
+                    if i == player:
+                        p['position'] = int(str(element.text).split(' место')[0])
+
+
+    for _ in our_positions:
+        print(_)
+    print()
+    print(participants)
 
 
 
@@ -182,7 +196,7 @@ async def cmd_select(message: types.Message, command: CommandObject):
         tender_link = command.args
         print(tender_link)
         await bot.send_message(message.from_user.id, f'Приступаю к обработке тендера по ссылке:\n{tender_link}')
-        get_players(tender_link)
+        get_our_position(tender_link)
 
 
 
