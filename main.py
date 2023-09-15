@@ -120,8 +120,8 @@ def get_our_position(tender_link):
     soup = BeautifulSoup(html_code, 'html.parser')
     target_div = soup.find('div', {'class': 'table-wrap table-wrap--wide'})
     # print(target_div)
-    soup = BeautifulSoup(str(target_div), 'html.parser')
-    thead = soup.find('tr', {'class': 'thead'})
+    main_soup = BeautifulSoup(str(target_div), 'html.parser')
+    thead = main_soup.find('tr', {'class': 'thead'})
     # print(thead)
     elements = thead.find_all(class_='company_and_user_info')
     for i, element in enumerate(elements):
@@ -137,17 +137,74 @@ def get_our_position(tender_link):
     print([str(participant) for participant in participants])
     print(participants[player])
 
-    # tbody = soup.find('tr', {'class': 'tbody'})
-    tbody = soup.find('tbody')
-    # elements = tbody.find_all(attrs={'data-tr-eq': True})
-    elements = soup.find_all(class_="c1 auction_offer_row_separator position_row")
+    # # tbody = soup.find('tr', {'class': 'tbody'})
+    # tbody = soup.find('tbody')
+    # # elements = tbody.find_all(attrs={'data-tr-eq': True})
+    elements = main_soup.find_all(class_="c1 auction_offer_row_separator position_row")
     our_positions = []
+    pos_list = []
+    # position_rename = {
+    #     'Дата отгрузки': ' <b>├─ Дата отгрузки</b>',
+    #     'Место отгрузки: ': '\n <b>├─ Место отгрузки:</b>\n',
+    #     'Общее доступное количество данной позиции (кг):': '\n <b>├─ Общее доступное количество (кг):</b>',
+    #     'Минимальный объем в заявке (кг):': '\n <b>├─ Минимальный объем в заявке (кг):</b>',
+    #     'Базис отгрузки: ': '\n <b>├─ Базис отгрузки:</b>\n',
+    # }
+
+    offer_row_separators_position_row = []
+
     for num, e in enumerate(elements):
         el = BeautifulSoup(str(e), 'html.parser').find_all(class_="multi_winner_offer_cell")
         for n, elem in enumerate(el):
             # print(n, _.text)
             if n == player:
                 if elem.text != '—':
+                    collapsible_content = e.find(class_="collapsible-content as-hidden")
+                    position_data = ''
+                    if collapsible_content:
+                        # Избавимся от экранирования в ключах для упрощения
+                        ordered_keys = [
+                            "Дата отгрузки",
+                            "Общее доступное количество данной позиции (кг)",
+                            "Минимальный объем в заявке (кг)",
+                            "Базис отгрузки",
+                            "Место отгрузки"
+                        ]
+
+                        # Инициализируем словарь для сохранения результатов
+                        position_data = {}
+
+                        # Для каждого ключа ищем его начало и конец в строке
+                        for i, key in enumerate(ordered_keys):
+                            key_with_colon = f"{key}:"
+                            start_idx = collapsible_content.text.find(key_with_colon)
+
+                            if start_idx == -1:
+                                continue  # если ключ не найден, переходим к следующему
+
+                            start_idx += len(key_with_colon)  # начало значения
+
+                            # ищем начало следующего ключа (или конец строки)
+                            if i + 1 < len(ordered_keys):
+                                end_idx = collapsible_content.text.find(ordered_keys[i + 1])
+                            else:
+                                end_idx = len(collapsible_content.text)
+
+                            # извлекаем значение
+                            value = collapsible_content.text[start_idx:end_idx].strip()
+
+                            # сохраняем в словаре
+                            position_data[key] = value
+                        # print(position_data)
+                        # parsed_data
+
+                        # print(f"Collapsible Content: {collapsible_content.text}")
+                        # position_data = str(collapsible_content.text)
+                        # for k, v in position_rename.items():
+                        #     position_data = position_data.replace(k, v)
+
+                    else:
+                        pass
                     price = elem.text.split('Ранг недоступен в данном типе процедуры')[1]
                     price = float(price.split('руб.')[0].replace(' ', '').replace(',', '.').replace('\xa0', ''))
                     amount = elem.text.split('Количество килограмм: ')[1]
@@ -159,22 +216,28 @@ def get_our_position(tender_link):
                                           "visible_number":     pos,    # DS: отображаемый номер лота (строки)
                                           "our_column":         n,      # DS: номер нашей колонки
                                           "our_price":          price,  # DS: наша цена заявки за единицу (руб)
-                                          "our_amount":         amount  # DS: наш объем заявки (кг)
+                                          "our_amount":         amount,  # DS: наш объем заявки (кг)
+                                          "position_data":      position_data  # DS: наш объем заявки (кг)
                                           })
+                    offer_row_separators_position_row.append(num)
+    print(our_positions)
+
+    offer_row_separators = []
+
     elements = soup.find_all(class_='c1 auction_offer_row_separator')
 
     # print(our_positions)
     for p in our_positions:
         # print(p)
         for num, e in enumerate(elements):
-            if f"Итого по лоту №{p['visible_number']} " in e.text:
-                # print(e)
-                fragment_soup = BeautifulSoup(str(e), 'html.parser')
 
+            if f"Итого по лоту №{p['visible_number']} " in e.text:
+                fragment_soup = BeautifulSoup(str(e), 'html.parser')
                 els = fragment_soup.find_all(class_="c1 auction_offer_row_separator", attrs={"data-tr-eq": True})
                 for element in els:
                     data_tr_eq_value = element.get('data-tr-eq')
                     p['score_string'] = data_tr_eq_value
+                    offer_row_separators.append(num)
                     # print(f"Значение атрибута data-tr-eq: {data_tr_eq_value}")
 
                 els = fragment_soup.find_all(class_="position_group_multi_winner_offer_cell")
@@ -183,21 +246,84 @@ def get_our_position(tender_link):
                         p['position'] = int(str(element.text).split(' место')[0])
 
 
-    for _ in our_positions:
-        print(_)
-    print()
-    print(participants)
+    r = get_other_positions(main_soup, offer_row_separators, offer_row_separators_position_row)
+    # print(offer_row_separators, offer_row_separators_position_row)
+    return our_positions, player
+    # print()
+    # print(participants)
 
 
+def get_other_positions(main_soup, offer_row_separators, offer_row_separators_position_row):
+    print(offer_row_separators_position_row)
+    print(offer_row_separators)
+    aggregate = {}
+    for n, row in enumerate(offer_row_separators_position_row):
+        aggregate[row] = offer_row_separators[n]
+    print(aggregate)
+
+    other_amounts = {}
+    elements = main_soup.find_all(class_="c1 auction_offer_row_separator position_row")
+    for num, e in enumerate(elements):
+        for row in offer_row_separators_position_row:
+            if num == row:
+                el = BeautifulSoup(str(e), 'html.parser').find_all(class_="multi_winner_offer_cell")
+                for n, elem in enumerate(el):
+                    if elem.text != '—':
+
+                        amount = elem.text.split('Количество килограмм: ')[1]
+                        amount = int(amount.split('кг')[0].replace(' ', '').replace('\xa0', ''))
+
+                        # Инициализируем вложенный словарь, если он еще не существует
+                        if num not in other_amounts:
+                            other_amounts[num] = {}
+
+                        # Добавляем новую пару ключ-значение в вложенный словарь
+                        other_amounts[num][n] = amount
+    elements = main_soup.find_all(class_='c1 auction_offer_row_separator')
+    other_positions = {}
+    for num in offer_row_separators:  # перебор только по тем строкам, что указаны в offer_row_separators
+        e = elements[num]  # соответствующий элемент из списка elements
+        position_cells = {}
+        # поиск всех нужных td-элементов внутри e
+        all_cells = e.find_all('td')
+        for cell_num, cell in enumerate(all_cells):
+            cell_classes = cell.get('class', [])
+            if "position_group_multi_winner_offer_cell" in cell_classes:
+                position_cells[cell_num] = {'text': cell.text.strip(), 'highlighted': 'highlighted' in cell_classes}
+
+        other_positions[num] = position_cells
+
+    print(other_positions)
+    print(other_amounts)
 
 @dp.message(Command(commands=['select']))
 async def cmd_select(message: types.Message, command: CommandObject):
     if 'b2b-center.ru/market/' in command.args:
+        messages_1 = []
+        messages_2 = []
         tender_link = command.args
         print(tender_link)
-        await bot.send_message(message.from_user.id, f'Приступаю к обработке тендера по ссылке:\n{tender_link}')
-        get_our_position(tender_link)
+        result = get_our_position(tender_link)
+        await bot.send_message(message.from_user.id, f'<b>Позиции по лотам в текущем <a href="{tender_link}">тендере</a>:</b>', parse_mode='HTML')
 
+        for _ in result[0]:
+            # print(_['position_data'])
+            flag = '🟩'
+            # placeholder = ''
+            bid_info = ''
+            for k, v in _['position_data'].items():
+                bid_info += f'<b>├─ {k}:</b> {v}\n'
+            placeholder = f'<b>├─ Позиции участников перед нами:</b>\n' \
+                          f'<b>├─ [1]</b> ─ 1500 кг.\n' \
+                          f'<b>├─ Общая выборка перед нами (включительно):</b>\n' \
+                          f'├─ 100000 / {_["position_data"]["Общее доступное количество данной позиции (кг)"]}\n'
+            position_string = f"<b> {flag}  Лот №{_['visible_number']}</b>\n" \
+                              f"{bid_info}" \
+                              f"{placeholder}" \
+                              f"<b>├─ Наша цена:</b> {_['our_price']} руб.\n" \
+                              f"<b>├─ Наш объем:</b> {_['our_amount']} кг.\n" \
+                              f"<b>└─ Наша позиция:</b> №{_['position']}"
+            msg = await bot.send_message(message.from_user.id, position_string, parse_mode='HTML')
 
 
 @dp.message(Command(commands=['info']))
