@@ -220,11 +220,11 @@ def get_our_position(tender_link):
                                           "position_data":      position_data  # DS: наш объем заявки (кг)
                                           })
                     offer_row_separators_position_row.append(num)
-    print(our_positions)
+    # print(our_positions)
 
-    offer_row_separators = []
+    offer_row_separators = {}
 
-    elements = soup.find_all(class_='c1 auction_offer_row_separator')
+    elements = main_soup.find_all(class_='c1 auction_offer_row_separator')
 
     # print(our_positions)
     for p in our_positions:
@@ -232,12 +232,16 @@ def get_our_position(tender_link):
         for num, e in enumerate(elements):
 
             if f"Итого по лоту №{p['visible_number']} " in e.text:
+                # print(e)
+                if e.find(class_='position_group_multi_winner_offer_cell'):
+                    offer_row_separators[p['internal_number']] = e
                 fragment_soup = BeautifulSoup(str(e), 'html.parser')
                 els = fragment_soup.find_all(class_="c1 auction_offer_row_separator", attrs={"data-tr-eq": True})
                 for element in els:
                     data_tr_eq_value = element.get('data-tr-eq')
                     p['score_string'] = data_tr_eq_value
-                    offer_row_separators.append(num)
+                    # if e.find(class_='position_group_multi_winner_offer_cell'):
+                    # print(num, p)
                     # print(f"Значение атрибута data-tr-eq: {data_tr_eq_value}")
 
                 els = fragment_soup.find_all(class_="position_group_multi_winner_offer_cell")
@@ -245,22 +249,15 @@ def get_our_position(tender_link):
                     if i == player:
                         p['position'] = int(str(element.text).split(' место')[0])
 
+    combined_dict = get_other_positions(main_soup, offer_row_separators, offer_row_separators_position_row, player)
 
-    r = get_other_positions(main_soup, offer_row_separators, offer_row_separators_position_row)
     # print(offer_row_separators, offer_row_separators_position_row)
-    return our_positions, player
+    return our_positions, player, combined_dict
     # print()
     # print(participants)
 
 
-def get_other_positions(main_soup, offer_row_separators, offer_row_separators_position_row):
-    print(offer_row_separators_position_row)
-    print(offer_row_separators)
-    aggregate = {}
-    for n, row in enumerate(offer_row_separators_position_row):
-        aggregate[row] = offer_row_separators[n]
-    print(aggregate)
-
+def get_other_positions(main_soup, offer_row_separators, offer_row_separators_position_row, player):
     other_amounts = {}
     elements = main_soup.find_all(class_="c1 auction_offer_row_separator position_row")
     for num, e in enumerate(elements):
@@ -269,32 +266,34 @@ def get_other_positions(main_soup, offer_row_separators, offer_row_separators_po
                 el = BeautifulSoup(str(e), 'html.parser').find_all(class_="multi_winner_offer_cell")
                 for n, elem in enumerate(el):
                     if elem.text != '—':
-
                         amount = elem.text.split('Количество килограмм: ')[1]
                         amount = int(amount.split('кг')[0].replace(' ', '').replace('\xa0', ''))
-
-                        # Инициализируем вложенный словарь, если он еще не существует
                         if num not in other_amounts:
                             other_amounts[num] = {}
-
-                        # Добавляем новую пару ключ-значение в вложенный словарь
                         other_amounts[num][n] = amount
-    elements = main_soup.find_all(class_='c1 auction_offer_row_separator')
-    other_positions = {}
-    for num in offer_row_separators:  # перебор только по тем строкам, что указаны в offer_row_separators
-        e = elements[num]  # соответствующий элемент из списка elements
-        position_cells = {}
-        # поиск всех нужных td-элементов внутри e
-        all_cells = e.find_all('td')
-        for cell_num, cell in enumerate(all_cells):
-            cell_classes = cell.get('class', [])
-            if "position_group_multi_winner_offer_cell" in cell_classes:
-                position_cells[cell_num] = {'text': cell.text.strip(), 'highlighted': 'highlighted' in cell_classes}
-
-        other_positions[num] = position_cells
-    #
-    # print(other_positions)
     # print(other_amounts)
+    combined_dict = {}
+    for k, v in offer_row_separators.items():
+        # print(k, v)
+        elements = v.find_all(class_='position_group_multi_winner_offer_cell')
+        our_place = str(elements[player].text).split('место')[0].replace(' ', '')
+        for n, e in enumerate(elements):
+            if 'место' in e.text:
+                content = str(e.text).split('место')[0].replace(' ', '')
+                if content <= our_place:
+                    # print(k, n, content)
+                    if n in other_amounts[k]:  # Проверяем, есть ли ключ n в подсловаре
+                        if k not in combined_dict:
+                            combined_dict[k] = {}
+
+                        combined_dict[k][n] = {
+                            'amount': other_amounts[k][n],
+                            'place': content
+                        }
+    # print(combined_dict)
+    return combined_dict
+
+
 
 @dp.message(Command(commands=['select']))
 async def cmd_select(message: types.Message, command: CommandObject):
@@ -305,18 +304,45 @@ async def cmd_select(message: types.Message, command: CommandObject):
         print(tender_link)
         result = get_our_position(tender_link)
         await bot.send_message(message.from_user.id, f'<b>Позиции по лотам в текущем <a href="{tender_link}">тендере</a>:</b>', parse_mode='HTML')
-
+        print(result[0])
+        print(result[2])
         for _ in result[0]:
             # print(_['position_data'])
-            flag = '🟩'
+            greenflag = '🟩'
+            redflag = '🟥'
+            # flag = greenflag
             # placeholder = ''
             bid_info = ''
+            places = ''
             for k, v in _['position_data'].items():
                 bid_info += f'<b>├─ {k}:</b> {v}\n'
+            places_before_sorting = {}
+            for key1, value1 in result[2].items():
+                if key1 == _['internal_number']:
+                    for key2, value2 in value1.items():
+                        #
+                        # print(value2['amount'], value2['place'])
+                        places_before_sorting[value2['place']] = value2['amount']
+
+            sorted_dict = {k: places_before_sorting[k] for k in sorted(places_before_sorting, key=lambda x: int(x))}
+
+            total = 0
+            for k, v in sorted_dict.items():
+                if int(k) <= int(_['position']):
+                    places += f"<b>├─ [{k}]</b> ─ {v} кг.\n"
+                    total += int(v)
+            print(total)
+                        # print(key, k, v)
+            #     for y in x:
+            #         ...
+            if int(total) < int(_["position_data"]["Общее доступное количество данной позиции (кг)"]):
+                flag = greenflag
+            else:
+                flag = redflag
             placeholder = f'<b>├─ Позиции участников перед нами:</b>\n' \
-                          f'<b>├─ [1]</b> ─ 1500 кг.\n' \
+                          f'{places}' \
                           f'<b>├─ Общая выборка перед нами (включительно):</b>\n' \
-                          f'├─ 100000 / {_["position_data"]["Общее доступное количество данной позиции (кг)"]}\n'
+                          f'├─ {total} / {_["position_data"]["Общее доступное количество данной позиции (кг)"]}\n'
             position_string = f"<b> {flag}  Лот №{_['visible_number']}</b>\n" \
                               f"{bid_info}" \
                               f"{placeholder}" \
