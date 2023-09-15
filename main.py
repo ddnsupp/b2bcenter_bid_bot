@@ -292,9 +292,9 @@ def get_other_positions(main_soup, offer_row_separators, offer_row_separators_po
                 position_cells[cell_num] = {'text': cell.text.strip(), 'highlighted': 'highlighted' in cell_classes}
 
         other_positions[num] = position_cells
-
-    print(other_positions)
-    print(other_amounts)
+    #
+    # print(other_positions)
+    # print(other_amounts)
 
 @dp.message(Command(commands=['select']))
 async def cmd_select(message: types.Message, command: CommandObject):
