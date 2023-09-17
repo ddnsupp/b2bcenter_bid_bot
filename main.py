@@ -19,7 +19,8 @@ import logging
 from logging import getLogger
 from logging.handlers import RotatingFileHandler
 import traceback
-
+from  datetime import datetime
+import pytz
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -298,20 +299,18 @@ def get_other_positions(main_soup, offer_row_separators, offer_row_separators_po
 @dp.message(Command(commands=['select']))
 async def cmd_select(message: types.Message, command: CommandObject):
     if 'b2b-center.ru/market/' in command.args:
-        messages_1 = []
-        messages_2 = []
+        change_list = []
+        delete_list = []
         tender_link = command.args
         print(tender_link)
-        result = get_our_position(tender_link)
+
         await bot.send_message(message.from_user.id, f'<b>Позиции по лотам в текущем <a href="{tender_link}">тендере</a>:</b>', parse_mode='HTML')
-        print(result[0])
-        print(result[2])
+
+        result = get_our_position(tender_link)
+        msk_now = datetime.now(pytz.utc).astimezone(pytz.timezone('Europe/Moscow')).strftime("%H:%M:%S %d.%m.%Y")
         for _ in result[0]:
-            # print(_['position_data'])
             greenflag = '🟩'
             redflag = '🟥'
-            # flag = greenflag
-            # placeholder = ''
             bid_info = ''
             places = ''
             for k, v in _['position_data'].items():
@@ -320,8 +319,6 @@ async def cmd_select(message: types.Message, command: CommandObject):
             for key1, value1 in result[2].items():
                 if key1 == _['internal_number']:
                     for key2, value2 in value1.items():
-                        #
-                        # print(value2['amount'], value2['place'])
                         places_before_sorting[value2['place']] = value2['amount']
 
             sorted_dict = {k: places_before_sorting[k] for k in sorted(places_before_sorting, key=lambda x: int(x))}
@@ -333,8 +330,7 @@ async def cmd_select(message: types.Message, command: CommandObject):
                     total += int(v)
             print(total)
                         # print(key, k, v)
-            #     for y in x:
-            #         ...
+
             if int(total) < int(_["position_data"]["Общее доступное количество данной позиции (кг)"]):
                 flag = greenflag
             else:
@@ -348,8 +344,67 @@ async def cmd_select(message: types.Message, command: CommandObject):
                               f"{placeholder}" \
                               f"<b>├─ Наша цена:</b> {_['our_price']} руб.\n" \
                               f"<b>├─ Наш объем:</b> {_['our_amount']} кг.\n" \
-                              f"<b>└─ Наша позиция:</b> №{_['position']}"
+                              f"<b>└─ Наша позиция:</b> №{_['position']}\n\n" \
+                              f"<b>┌─ Время обновления: </b>\n" \
+                              f"<b>└─ {msk_now} (МСК)</b>\n"
             msg = await bot.send_message(message.from_user.id, position_string, parse_mode='HTML')
+            change_list.append((message.chat.id, msg.message_id, _['internal_number'], total, _['position']))
+        print(change_list)
+        while True:
+            await asyncio.sleep(60)
+            result = get_our_position(tender_link)
+            msk_now = datetime.now(pytz.utc).astimezone(pytz.timezone('Europe/Moscow')).strftime("%H:%M:%S %d.%m.%Y")
+            for num_, _ in enumerate(result[0]):
+                greenflag = '🟩'
+                redflag = '🟥'
+                bid_info = ''
+                places = ''
+                for k, v in _['position_data'].items():
+                    bid_info += f'<b>├─ {k}:</b> {v}\n'
+                places_before_sorting = {}
+                for key1, value1 in result[2].items():
+                    if key1 == _['internal_number']:
+                        for key2, value2 in value1.items():
+                            #
+                            # print(value2['amount'], value2['place'])
+                            places_before_sorting[value2['place']] = value2['amount']
+
+                sorted_dict = {k: places_before_sorting[k] for k in sorted(places_before_sorting, key=lambda x: int(x))}
+
+                total = 0
+                for k, v in sorted_dict.items():
+                    if int(k) <= int(_['position']):
+                        places += f"<b>├─ [{k}]</b> ─ {v} кг.\n"
+                        total += int(v)
+                print(total)
+                # print(key, k, v)
+                #     for y in x:
+                #         ...
+                if int(total) < int(_["position_data"]["Общее доступное количество данной позиции (кг)"]):
+                    flag = greenflag
+                else:
+                    flag = redflag
+                placeholder = f'<b>├─ Позиции участников перед нами:</b>\n' \
+                              f'{places}' \
+                              f'<b>├─ Общая выборка перед нами (включительно):</b>\n' \
+                              f'├─ {total} / {_["position_data"]["Общее доступное количество данной позиции (кг)"]}\n'
+                position_string = f"<b> {flag}  Лот №{_['visible_number']}</b>\n" \
+                                  f"{bid_info}" \
+                                  f"{placeholder}" \
+                                  f"<b>├─ Наша цена:</b> {_['our_price']} руб.\n" \
+                                  f"<b>├─ Наш объем:</b> {_['our_amount']} кг.\n" \
+                                  f"<b>└─ Наша позиция:</b> №{_['position']}\n\n" \
+                                  f"<b>┌─ Время обновления: </b>\n"\
+                                  f"<b>└─ {msk_now} (МСК)</b>\n"
+                for x in change_list:
+                    if x[2] == _['internal_number']:
+                        await bot.edit_message_text(chat_id=x[0], message_id=x[1], text=position_string,
+                                                    parse_mode='HTML')
+                        # if x[3] != total or x[4] != _['position']:
+                        #     await bot.edit_message_text(chat_id=x[0], message_id=x[1], text=position_string, parse_mode='HTML')
+
+                # msg = await bot.send_message(message.from_user.id, position_string, parse_mode='HTML')
+                # change_list.append((message.chat.id, msg.message_id, _['internal_number'], total, _['position']))
 
 
 @dp.message(Command(commands=['info']))
