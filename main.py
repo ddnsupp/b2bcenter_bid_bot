@@ -19,7 +19,7 @@ import logging
 from logging import getLogger
 from logging.handlers import RotatingFileHandler
 import traceback
-from  datetime import datetime
+from datetime import datetime
 import pytz
 
 logger = logging.getLogger(__name__)
@@ -111,7 +111,6 @@ class Participant:
         self.rank = rank
 
 
-
 def get_our_position(tender_link):
     participants = []
     player = 0
@@ -120,10 +119,8 @@ def get_our_position(tender_link):
     html_code = driver.page_source
     soup = BeautifulSoup(html_code, 'html.parser')
     target_div = soup.find('div', {'class': 'table-wrap table-wrap--wide'})
-    # print(target_div)
     main_soup = BeautifulSoup(str(target_div), 'html.parser')
     thead = main_soup.find('tr', {'class': 'thead'})
-    # print(thead)
     elements = thead.find_all(class_='company_and_user_info')
     for i, element in enumerate(elements):
         name = element.text.strip()  # Получение имени участника из текста элемента
@@ -135,74 +132,87 @@ def get_our_position(tender_link):
             participant = Participant(name=name, cell=cell)  # Создание нового объекта Participant
             participants.append(participant)  # Добавление объекта в список
 
-    print([str(participant) for participant in participants])
-    print(participants[player])
+    # print([str(participant) for participant in participants])
+    # print(participants[player])
 
-    # # tbody = soup.find('tr', {'class': 'tbody'})
-    # tbody = soup.find('tbody')
-    # # elements = tbody.find_all(attrs={'data-tr-eq': True})
     elements = main_soup.find_all(class_="c1 auction_offer_row_separator position_row")
     our_positions = []
-    pos_list = []
-    # position_rename = {
-    #     'Дата отгрузки': ' <b>├─ Дата отгрузки</b>',
-    #     'Место отгрузки: ': '\n <b>├─ Место отгрузки:</b>\n',
-    #     'Общее доступное количество данной позиции (кг):': '\n <b>├─ Общее доступное количество (кг):</b>',
-    #     'Минимальный объем в заявке (кг):': '\n <b>├─ Минимальный объем в заявке (кг):</b>',
-    #     'Базис отгрузки: ': '\n <b>├─ Базис отгрузки:</b>\n',
-    # }
+
 
     offer_row_separators_position_row = []
 
     for num, e in enumerate(elements):
         el = BeautifulSoup(str(e), 'html.parser').find_all(class_="multi_winner_offer_cell")
         for n, elem in enumerate(el):
-            # print(n, _.text)
             if n == player:
                 if elem.text != '—':
                     collapsible_content = e.find(class_="collapsible-content as-hidden")
-                    position_data = ''
-                    if collapsible_content:
-                        # Избавимся от экранирования в ключах для упрощения
-                        ordered_keys = [
-                            "Дата отгрузки",
-                            "Общее доступное количество данной позиции (кг)",
-                            "Минимальный объем в заявке (кг)",
-                            "Базис отгрузки",
-                            "Место отгрузки"
-                        ]
 
-                        # Инициализируем словарь для сохранения результатов
+                    if collapsible_content:
+                        ordered_keys = [
+                            "Дата отгрузки:",
+                            "Общее доступное количество данной позиции (кг):",
+                            "Общее доступное количество данной позиции:",
+                            "Минимальный объем в заявке (кг):",
+                            "Минимальный объем в заявке:",
+                            "Базис отгрузки:",
+                            "Место отгрузки:",
+                            "Термическое состояние:",
+                            "Период отгрузки начало:",
+                            "Период отгрузки конец:",
+                            "Вес паллета:",
+                        ]
+                        # if "Общее доступное количество данной позиции (кг):" in collapsible_content.text:
+                        #     ordered_keys.append("Общее доступное количество данной позиции (кг)")
+                        # elif "Общее доступное количество данной позиции:" in collapsible_content.text:
+                        #     ordered_keys.append("Общее доступное количество данной позиции")
+                        #
+                        # if "Минимальный объем в заявке (кг):" in collapsible_content.text:
+                        #     ordered_keys.append("Минимальный объем в заявке (кг)")
+                        # elif "Минимальный объем в заявке:" in collapsible_content.text:
+                        #     ordered_keys.append("Минимальный объем в заявке (кг)")
+
                         position_data = {}
 
-                        # Для каждого ключа ищем его начало и конец в строке
+                        lot_description = collapsible_content.text
+
                         for i, key in enumerate(ordered_keys):
-                            key_with_colon = f"{key}:"
-                            start_idx = collapsible_content.text.find(key_with_colon)
+                            if key in lot_description:
+                                try:
+                                    lot_description = lot_description.replace(f"{key}", f"\n{key}").replace("\n\n", "\n")
+                                except:
+                                    ...
 
-                            if start_idx == -1:
-                                continue  # если ключ не найден, переходим к следующему
+                        print(lot_description)
+                        ...
 
-                            start_idx += len(key_with_colon)  # начало значения
+                        for k in ordered_keys:
+                            if k in lot_description:
+                                start = lot_description.find(k) + len(k)
+                                end = start + lot_description[start:].find('\n')
+                                if end < start:
+                                    end = len(lot_description)
+                                position_data[k] = lot_description[start:end].strip()
 
-                            # ищем начало следующего ключа (или конец строки)
-                            if i + 1 < len(ordered_keys):
-                                end_idx = collapsible_content.text.find(ordered_keys[i + 1])
-                            else:
-                                end_idx = len(collapsible_content.text)
+                        print(position_data)
 
-                            # извлекаем значение
-                            value = collapsible_content.text[start_idx:end_idx].strip()
+                        # for i, key in enumerate(ordered_keys):
+                        #     key_with_colon = f"{key}:"
+                        #     start_idx = collapsible_content.text.find(key_with_colon)
+                        #
+                        #     if start_idx == -1:
+                        #         continue  # если ключ не найден, переходим к следующему
+                        #
+                        #     start_idx += len(key_with_colon)  # начало значения
+                        #
+                        #     if i + 1 < len(ordered_keys):
+                        #         end_idx = collapsible_content.text.find(ordered_keys[i + 1])
+                        #     else:
+                        #         end_idx = len(collapsible_content.text)
+                        #
+                        #     value = collapsible_content.text[start_idx:end_idx].strip()
+                        #     position_data[key] = value
 
-                            # сохраняем в словаре
-                            position_data[key] = value
-                        # print(position_data)
-                        # parsed_data
-
-                        # print(f"Collapsible Content: {collapsible_content.text}")
-                        # position_data = str(collapsible_content.text)
-                        # for k, v in position_rename.items():
-                        #     position_data = position_data.replace(k, v)
 
                     else:
                         pass
@@ -218,10 +228,10 @@ def get_our_position(tender_link):
                                           "our_column":         n,      # DS: номер нашей колонки
                                           "our_price":          price,  # DS: наша цена заявки за единицу (руб)
                                           "our_amount":         amount,  # DS: наш объем заявки (кг)
-                                          "position_data":      position_data  # DS: наш объем заявки (кг)
+                                          "position_data":      position_data  # DS: объем заявки (кг)
                                           })
                     offer_row_separators_position_row.append(num)
-    # print(our_positions)
+    print(our_positions)
 
     offer_row_separators = {}
 
@@ -248,6 +258,7 @@ def get_our_position(tender_link):
                 els = fragment_soup.find_all(class_="position_group_multi_winner_offer_cell")
                 for i, element in enumerate(els):
                     if i == player:
+                        # p['position'] = int(str(element.text).split(' место')[0].replace(' ', ''))
                         p['position'] = int(str(element.text).split(' место')[0])
 
     combined_dict = get_other_positions(main_soup, offer_row_separators, offer_row_separators_position_row, player)
@@ -277,10 +288,10 @@ def get_other_positions(main_soup, offer_row_separators, offer_row_separators_po
     for k, v in offer_row_separators.items():
         # print(k, v)
         elements = v.find_all(class_='position_group_multi_winner_offer_cell')
-        our_place = str(elements[player].text).split('место')[0].replace(' ', '')
+        our_place = int(str(elements[player].text).split('место')[0].replace(' ', ''))
         for n, e in enumerate(elements):
             if 'место' in e.text:
-                content = str(e.text).split('место')[0].replace(' ', '')
+                content = int(str(e.text).split('место')[0].replace(' ', ''))
                 if content <= our_place:
                     # print(k, n, content)
                     if n in other_amounts[k]:  # Проверяем, есть ли ключ n в подсловаре
@@ -305,106 +316,85 @@ async def cmd_select(message: types.Message, command: CommandObject):
         print(tender_link)
 
         await bot.send_message(message.from_user.id, f'<b>Позиции по лотам в текущем <a href="{tender_link}">тендере</a>:</b>', parse_mode='HTML')
-
-        result = get_our_position(tender_link)
-        msk_now = datetime.now(pytz.utc).astimezone(pytz.timezone('Europe/Moscow')).strftime("%H:%M:%S %d.%m.%Y")
-        for _ in result[0]:
-            greenflag = '🟩'
-            redflag = '🟥'
-            bid_info = ''
-            places = ''
-            for k, v in _['position_data'].items():
-                bid_info += f'<b>├─ {k}:</b> {v}\n'
-            places_before_sorting = {}
-            for key1, value1 in result[2].items():
-                if key1 == _['internal_number']:
-                    for key2, value2 in value1.items():
-                        places_before_sorting[value2['place']] = value2['amount']
-
-            sorted_dict = {k: places_before_sorting[k] for k in sorted(places_before_sorting, key=lambda x: int(x))}
-
-            total = 0
-            for k, v in sorted_dict.items():
-                if int(k) <= int(_['position']):
-                    places += f"<b>├─ [{k}]</b> ─ {v} кг.\n"
-                    total += int(v)
-            print(total)
-                        # print(key, k, v)
-
-            if int(total) < int(_["position_data"]["Общее доступное количество данной позиции (кг)"]):
-                flag = greenflag
-            else:
-                flag = redflag
-            placeholder = f'<b>├─ Позиции участников перед нами:</b>\n' \
-                          f'{places}' \
-                          f'<b>├─ Общая выборка перед нами (включительно):</b>\n' \
-                          f'├─ {total} / {_["position_data"]["Общее доступное количество данной позиции (кг)"]}\n'
-            position_string = f"<b> {flag}  Лот №{_['visible_number']}</b>\n" \
-                              f"{bid_info}" \
-                              f"{placeholder}" \
-                              f"<b>├─ Наша цена:</b> {_['our_price']} руб.\n" \
-                              f"<b>├─ Наш объем:</b> {_['our_amount']} кг.\n" \
-                              f"<b>└─ Наша позиция:</b> №{_['position']}\n\n" \
-                              f"<b>┌─ Время обновления: </b>\n" \
-                              f"<b>└─ {msk_now} (МСК)</b>\n"
-            msg = await bot.send_message(message.from_user.id, position_string, parse_mode='HTML')
-            change_list.append((message.chat.id, msg.message_id, _['internal_number'], total, _['position']))
-        print(change_list)
+        r = get_our_position(tender_link)
+        for _ in r[0]:
+            msg = await bot.send_message(message.from_user.id, f"Место для информации лота №{_['visible_number']}",
+                                         parse_mode='HTML')
+            change_list.append((message.chat.id, msg.message_id, _['internal_number'], ' ', 0))
         while True:
-            await asyncio.sleep(60)
-            result = get_our_position(tender_link)
-            msk_now = datetime.now(pytz.utc).astimezone(pytz.timezone('Europe/Moscow')).strftime("%H:%M:%S %d.%m.%Y")
-            for num_, _ in enumerate(result[0]):
-                greenflag = '🟩'
-                redflag = '🟥'
-                bid_info = ''
-                places = ''
-                for k, v in _['position_data'].items():
-                    bid_info += f'<b>├─ {k}:</b> {v}\n'
-                places_before_sorting = {}
-                for key1, value1 in result[2].items():
-                    if key1 == _['internal_number']:
-                        for key2, value2 in value1.items():
-                            #
-                            # print(value2['amount'], value2['place'])
-                            places_before_sorting[value2['place']] = value2['amount']
+            try:
+                result = get_our_position(tender_link)
+                msk_now = datetime.now(pytz.utc).astimezone(pytz.timezone('Europe/Moscow')).strftime("%H:%M:%S %d.%m.%Y")
+                for _ in result[0]:
+                    greenflag = '🟩'
+                    redflag = '🟥'
+                    bid_info = ''
+                    places = ''
+                    for k, v in _['position_data'].items():
+                        bid_info += f'<b>├─ {k}</b> {v}\n'
+                    places_before_sorting = {}
+                    for key1, value1 in result[2].items():
+                        if key1 == _['internal_number']:
+                            for key2, value2 in value1.items():
+                                places_before_sorting[value2['place']] = value2['amount']
 
-                sorted_dict = {k: places_before_sorting[k] for k in sorted(places_before_sorting, key=lambda x: int(x))}
+                    sorted_dict = {k: places_before_sorting[k] for k in sorted(places_before_sorting, key=lambda x: int(x))}
 
-                total = 0
-                for k, v in sorted_dict.items():
-                    if int(k) <= int(_['position']):
-                        places += f"<b>├─ [{k}]</b> ─ {v} кг.\n"
-                        total += int(v)
-                print(total)
-                # print(key, k, v)
-                #     for y in x:
-                #         ...
-                if int(total) < int(_["position_data"]["Общее доступное количество данной позиции (кг)"]):
-                    flag = greenflag
-                else:
-                    flag = redflag
-                placeholder = f'<b>├─ Позиции участников перед нами:</b>\n' \
-                              f'{places}' \
-                              f'<b>├─ Общая выборка перед нами (включительно):</b>\n' \
-                              f'├─ {total} / {_["position_data"]["Общее доступное количество данной позиции (кг)"]}\n'
-                position_string = f"<b> {flag}  Лот №{_['visible_number']}</b>\n" \
-                                  f"{bid_info}" \
-                                  f"{placeholder}" \
-                                  f"<b>├─ Наша цена:</b> {_['our_price']} руб.\n" \
-                                  f"<b>├─ Наш объем:</b> {_['our_amount']} кг.\n" \
-                                  f"<b>└─ Наша позиция:</b> №{_['position']}\n\n" \
-                                  f"<b>┌─ Время обновления: </b>\n"\
-                                  f"<b>└─ {msk_now} (МСК)</b>\n"
-                for x in change_list:
-                    if x[2] == _['internal_number']:
-                        await bot.edit_message_text(chat_id=x[0], message_id=x[1], text=position_string,
-                                                    parse_mode='HTML')
-                        # if x[3] != total or x[4] != _['position']:
-                        #     await bot.edit_message_text(chat_id=x[0], message_id=x[1], text=position_string, parse_mode='HTML')
+                    total = 0
+                    for k, v in sorted_dict.items():
+                        if int(k) <= int(_['position']):
+                            places += f"<b>├─ [{k}]</b> ─ {v} кг.\n"
+                            total += int(v)
 
-                # msg = await bot.send_message(message.from_user.id, position_string, parse_mode='HTML')
-                # change_list.append((message.chat.id, msg.message_id, _['internal_number'], total, _['position']))
+                    total_position_amount = 0
+                    if "Общее доступное количество данной позиции (кг):" in _["position_data"]:
+                        total_position_amount = int(
+                            _["position_data"]["Общее доступное количество данной позиции (кг):"])
+                    elif "Общее доступное количество данной позиции:" in _["position_data"]:
+                        amount_str = ''.join(filter(lambda x: x.isdigit(),
+                                                    _["position_data"]["Общее доступное количество данной позиции:"]))
+                        total_position_amount = int(amount_str)
+
+                    if int(total) < total_position_amount:
+                        flag = greenflag
+                    else:
+                        flag = redflag
+                    placeholder = f'<b>├─ Позиции участников перед нами:</b>\n' \
+                                  f'{places}' \
+                                  f'<b>├─ Общая выборка перед нами (включительно):</b>\n' \
+                                  f'├─ {total} / {total_position_amount}\n'
+                    position_string = f"<b>┌─ Лот №{_['visible_number']}</b>\n" \
+                                      f"<b>├─ {flag*7}</b>\n" \
+                                      f"{bid_info}" \
+                                      f"{placeholder}" \
+                                      f"<b>├─ Наша цена:</b> {_['our_price']} руб.\n" \
+                                      f"<b>├─ Наш объем:</b> {_['our_amount']} кг.\n" \
+                                      f"<b>└─ Наша позиция:</b> №{_['position']}\n\n" \
+                                      f"<b>┌─ Время обновления: </b>\n" \
+                                      f"<b>└─ {msk_now} (МСК)</b>\n"
+
+                    for x in change_list:
+                        if x[2] == _['internal_number']:
+                            await bot.edit_message_text(chat_id=x[0], message_id=x[1], text=position_string,
+                                                        parse_mode='HTML')
+                    if flag == redflag:
+                    # if flag == greenflag:
+                        msg = await bot.send_message(message.from_user.id, f"Лот №{_['visible_number']} требует внимания!")
+                        delete_list.append((message.chat.id, msg.message_id))
+                await asyncio.sleep(60)
+                try:
+                    for _ in delete_list:
+                        try:
+                            await bot.delete_message(chat_id=_[0], message_id=_[1])
+                        except Exception as e:
+                            log_message('error', message.from_user.id, e, traceback.extract_stack()[-1])
+
+                except Exception as e:
+                    log_message('error', message.from_user.id, e, traceback.extract_stack()[-1])
+                delete_list.clear()
+            except Exception as e:
+                log_message('error', message.from_user.id, e, traceback.extract_stack()[-1])
+
 
 
 @dp.message(Command(commands=['info']))
