@@ -314,13 +314,13 @@ async def cmd_select(message: types.Message, command: CommandObject):
         delete_list = []
         tender_link = command.args
         print(tender_link)
-
-        await bot.send_message(message.from_user.id, f'<b>Позиции по лотам в текущем <a href="{tender_link}">тендере</a>:</b>', parse_mode='HTML')
-        r = get_our_position(tender_link)
-        for _ in r[0]:
-            msg = await bot.send_message(message.from_user.id, f"Место для информации лота №{_['visible_number']}",
-                                         parse_mode='HTML')
-            change_list.append((message.chat.id, msg.message_id, _['internal_number'], ' ', 0))
+        for u in users:
+            await bot.send_message(u, f'<b>Позиции по лотам в текущем <a href="{tender_link}">тендере</a>:</b>', parse_mode='HTML')
+            r = get_our_position(tender_link)
+            for _ in r[0]:
+                msg = await bot.send_message(u, f"Место для информации лота №{_['visible_number']}",
+                                             parse_mode='HTML')
+                change_list.append((u, msg.message_id, _['internal_number'], ' ', 0))
         while True:
             try:
                 result = get_our_position(tender_link)
@@ -365,7 +365,7 @@ async def cmd_select(message: types.Message, command: CommandObject):
                                   f'├─ {total} / {total_position_amount}\n'
                     position_string = f"<b>┌─ Лот №{_['visible_number']}</b>\n" \
                                       f"<b>├─ {flag*7}</b>\n" \
-                                      f"{bid_info}" \
+                                      f"<b>├─ {bid_info}" \
                                       f"{placeholder}" \
                                       f"<b>├─ Наша цена:</b> {_['our_price']} руб.\n" \
                                       f"<b>├─ Наш объем:</b> {_['our_amount']} кг.\n" \
@@ -379,8 +379,9 @@ async def cmd_select(message: types.Message, command: CommandObject):
                                                         parse_mode='HTML')
                     if flag == redflag:
                     # if flag == greenflag:
-                        msg = await bot.send_message(message.from_user.id, f"Лот №{_['visible_number']} требует внимания!")
-                        delete_list.append((message.chat.id, msg.message_id))
+                        for u in users:
+                            msg = await bot.send_message(u, f"Лот №{_['visible_number']} требует внимания!")
+                            delete_list.append((u, msg.message_id))
                 await asyncio.sleep(60)
                 try:
                     for _ in delete_list:
