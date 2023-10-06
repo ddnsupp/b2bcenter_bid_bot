@@ -365,7 +365,7 @@ async def cmd_select(message: types.Message, command: CommandObject):
                                   f'├─ {total} / {total_position_amount}\n'
                     position_string = f"<b>┌─ Лот №{_['visible_number']}</b>\n" \
                                       f"<b>├─ {flag*7}</b>\n" \
-                                      f"<b>├─ {bid_info}" \
+                                      f"{bid_info}" \
                                       f"{placeholder}" \
                                       f"<b>├─ Наша цена:</b> {_['our_price']} руб.\n" \
                                       f"<b>├─ Наш объем:</b> {_['our_amount']} кг.\n" \
