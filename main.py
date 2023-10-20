@@ -360,8 +360,8 @@ async def cmd_select(message: types.Message, command: CommandObject):
                             places += f"<b>├─ [{k}]</b> ─ {v} кг.<b> ─ НАША ПОЗИЦИЯ</b>\n"
                         else:
                             places += f"<b>├─ [{k}]</b> ─ {v} кг.\n"
-
-                        total += int(v)
+                        if k <= _['position']:
+                            total += int(v)
 
                     total_position_amount = 0
                     if "Общее доступное количество данной позиции (кг):" in _["position_data"]:
