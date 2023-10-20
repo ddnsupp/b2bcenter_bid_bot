@@ -183,7 +183,7 @@ def get_our_position(tender_link):
                                 except:
                                     ...
 
-                        print(lot_description)
+                        # print(lot_description)
                         ...
 
                         for k in ordered_keys:
@@ -194,7 +194,7 @@ def get_our_position(tender_link):
                                     end = len(lot_description)
                                 position_data[k] = lot_description[start:end].strip()
 
-                        print(position_data)
+                        # print(position_data)
 
                         # for i, key in enumerate(ordered_keys):
                         #     key_with_colon = f"{key}:"
@@ -223,15 +223,15 @@ def get_our_position(tender_link):
                     pos = elem.find_parent(class_="c1 auction_offer_row_separator position_row").find(
                         class_="multi_winner_position_cell").get('position_group_id', 'N/A')
                     # print(f'Вн. номер строки {num}, видимый номер позиции {pos}, номер нашей колонки {n}, наша ставка {price} руб., наш объем {amount} кг.')
-                    our_positions.append({"internal_number":    num,    # DS: внутренний номер лота (строки)
-                                          "visible_number":     pos,    # DS: отображаемый номер лота (строки)
-                                          "our_column":         n,      # DS: номер нашей колонки
-                                          "our_price":          price,  # DS: наша цена заявки за единицу (руб)
-                                          "our_amount":         amount,  # DS: наш объем заявки (кг)
-                                          "position_data":      position_data  # DS: объем заявки (кг)
+                    our_positions.append({"internal_number":    num,            # DS: внутренний номер лота (строки)
+                                          "visible_number":     pos,            # DS: отображаемый номер лота (строки)
+                                          "our_column":         n,              # DS: номер нашей колонки
+                                          "our_price":          price,          # DS: наша цена заявки за единицу (руб)
+                                          "our_amount":         amount,         # DS: наш объем заявки (кг)
+                                          "position_data":      position_data   # DS: объем заявки (кг)
                                           })
                     offer_row_separators_position_row.append(num)
-    print(our_positions)
+    # print(our_positions)
 
     offer_row_separators = {}
 
@@ -292,16 +292,25 @@ def get_other_positions(main_soup, offer_row_separators, offer_row_separators_po
         for n, e in enumerate(elements):
             if 'место' in e.text:
                 content = int(str(e.text).split('место')[0].replace(' ', ''))
-                if content <= our_place:
-                    # print(k, n, content)
-                    if n in other_amounts[k]:  # Проверяем, есть ли ключ n в подсловаре
-                        if k not in combined_dict:
-                            combined_dict[k] = {}
+                # print(k, n, content)
+                if n in other_amounts[k]:  # Проверяем, есть ли ключ n в под-словаре
+                    if k not in combined_dict:
+                        combined_dict[k] = {}
 
-                        combined_dict[k][n] = {
-                            'amount': other_amounts[k][n],
-                            'place': content
-                        }
+                    combined_dict[k][n] = {
+                        'amount': other_amounts[k][n],
+                        'place': content
+                    }
+                # if content <= our_place:
+                #     # print(k, n, content)
+                #     if n in other_amounts[k]:  # Проверяем, есть ли ключ n в под-словаре
+                #         if k not in combined_dict:
+                #             combined_dict[k] = {}
+                #
+                #         combined_dict[k][n] = {
+                #             'amount': other_amounts[k][n],
+                #             'place': content
+                #         }
     # print(combined_dict)
     return combined_dict
 
@@ -332,6 +341,7 @@ async def cmd_select(message: types.Message, command: CommandObject):
                     places = ''
                     for k, v in _['position_data'].items():
                         bid_info += f'<b>├─ {k}</b> {v}\n'
+
                     places_before_sorting = {}
                     for key1, value1 in result[2].items():
                         if key1 == _['internal_number']:
@@ -341,10 +351,17 @@ async def cmd_select(message: types.Message, command: CommandObject):
                     sorted_dict = {k: places_before_sorting[k] for k in sorted(places_before_sorting, key=lambda x: int(x))}
 
                     total = 0
+                    # for k, v in sorted_dict.items():
+                    #     if int(k) <= int(_['position']):
+                    #         places += f"<b>├─ [{k}]</b> ─ {v} кг.\n"
+                    #         total += int(v)
                     for k, v in sorted_dict.items():
-                        if int(k) <= int(_['position']):
+                        if int(k) == int(_['position']):
+                            places += f"<b>├─ [{k}]</b> ─ {v} кг.<b> ─ НАША ПОЗИЦИЯ</b>\n"
+                        else:
                             places += f"<b>├─ [{k}]</b> ─ {v} кг.\n"
-                            total += int(v)
+
+                        total += int(v)
 
                     total_position_amount = 0
                     if "Общее доступное количество данной позиции (кг):" in _["position_data"]:
@@ -355,24 +372,30 @@ async def cmd_select(message: types.Message, command: CommandObject):
                                                     _["position_data"]["Общее доступное количество данной позиции:"]))
                         total_position_amount = int(amount_str)
 
+                    shipment_date = ''
+                    if "Дата отгрузки:" in _["position_data"]:
+                        shipment_date = _["position_data"]["Дата отгрузки:"]
+
                     if int(total) < total_position_amount:
                         flag = greenflag
                     else:
                         flag = redflag
-                    placeholder = f'<b>├─ Позиции участников перед нами:</b>\n' \
+                    placeholder = f'<b>├─ Дата отгрузки: {shipment_date}</b>\n' \
+                                  f'<b>├─ Позиции участников:</b>\n' \
                                   f'{places}' \
+                                  f'<b>├─ {flag*7}</b>\n' \
                                   f'<b>├─ Общая выборка перед нами (включительно):</b>\n' \
-                                  f'├─ {total} / {total_position_amount}\n'
+                                  f'<b>├─</b> {total} / {total_position_amount}\n' \
+                                  f'<b>├─ {flag*7}</b>\n'
                     position_string = f"<b>┌─ Лот №{_['visible_number']}</b>\n" \
-                                      f"<b>├─ {flag*7}</b>\n" \
-                                      f"{bid_info}" \
+                                      f"<b>├─ Общее доступно количество:</b> {total_position_amount} кг.\n" \
                                       f"{placeholder}" \
                                       f"<b>├─ Наша цена:</b> {_['our_price']} руб.\n" \
                                       f"<b>├─ Наш объем:</b> {_['our_amount']} кг.\n" \
                                       f"<b>└─ Наша позиция:</b> №{_['position']}\n\n" \
                                       f"<b>┌─ Время обновления: </b>\n" \
                                       f"<b>└─ {msk_now} (МСК)</b>\n"
-
+                    #                                       f"<b>├─ {flag*7}</b>\n" \
                     for x in change_list:
                         if x[2] == _['internal_number']:
                             await bot.edit_message_text(chat_id=x[0], message_id=x[1], text=position_string,
